@@ -316,6 +316,25 @@
       </div>
       <div id="import-preview" style="margin-top:1rem"></div>
     </div>
+
+    <div class="card" style="max-width:640px">
+      <div class="card-title">🖨 Import printhead data from CSV</div>
+      <p style="font-size:13px;color:#73726c;margin-bottom:1rem">
+        Upload a CSV previously exported from the Printheads tab. Columns must match:
+        <strong>Brand, Model, Serial, Installation Status, Print Status, Location, Date Installed, Notes</strong>.
+        Existing printheads (matched by serial number) will be updated; new serial numbers will be added.
+        Cleaning history is preserved for existing records.
+      </p>
+      <div class="import-zone" id="ph-import-zone" onclick="document.getElementById('ph-csv-file').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')" ondrop="handlePHDrop(event)">
+        <input type="file" id="ph-csv-file" accept=".csv" onchange="handlePHFileSelect(this)">
+        <div style="font-size:2rem;margin-bottom:8px">🖨</div>
+        <div style="font-weight:500;margin-bottom:4px">Click to choose a printhead CSV, or drag and drop</div>
+        <div style="font-size:12px">Files are named printheads-export-YYYY-MM-DD.csv</div>
+      </div>
+      <div id="ph-import-preview" style="margin-top:1rem"></div>
+    </div>
   </div>
 
   <!-- ACTIVITY LOG -->
@@ -346,6 +365,7 @@
       </select>
       <div class="spacer"></div>
       <button class="btn btn-success" onclick="exportPHCSV()">⬇ Export to CSV</button>
+      <button class="btn" onclick="showTab('import',document.querySelectorAll('.nav-btn')[4]);setTimeout(()=>document.getElementById('ph-import-zone').scrollIntoView({behavior:'smooth'}),100)">⬆ Import CSV</button>
       <button class="btn btn-blue" onclick="openAddPH()">+ Add Printhead</button>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
@@ -710,6 +730,88 @@ function commitImport(rows){
   scheduleSave();
   showImportResult('success','Import complete: '+added+' added, '+updated+' updated.');
   document.getElementById('csv-file').value='';
+}
+
+// ── PRINTHEAD CSV IMPORT ───────────────────────────────────
+function handlePHDrop(e){
+  e.preventDefault();document.getElementById('ph-import-zone').classList.remove('drag');
+  const f=e.dataTransfer.files[0];if(f)parsePHCSVFile(f);
+}
+function handlePHFileSelect(i){if(i.files[0])parsePHCSVFile(i.files[0]);}
+function parsePHCSVFile(f){const r=new FileReader();r.onload=e=>previewPHCSV(e.target.result);r.readAsText(f,'UTF-8');}
+
+function previewPHCSV(text){
+  const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){showPHImportResult('error','File is empty or invalid.');return;}
+  const hdr=parseCSVLine(lines[0]).map(h=>h.toLowerCase().trim());
+  if(hdr.indexOf('serial')===-1||hdr.indexOf('brand')===-1){
+    showPHImportResult('error','CSV is missing required columns "Brand" and "Serial". Make sure this was exported from the Printheads tab.');return;
+  }
+  const g=(cols,name,def='')=>{const i=hdr.indexOf(name);return i>=0&&cols[i]!==undefined?cols[i].trim():def;};
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim())continue;
+    const c=parseCSVLine(lines[i]);
+    const row={
+      brand:     g(c,'brand'),
+      model:     g(c,'model'),
+      serial:    g(c,'serial'),
+      installStatus: g(c,'installation status','Installed'),
+      printStatus:   g(c,'print status','OK'),
+      location:  g(c,'location'),
+      dateInstalled: g(c,'date installed'),
+      notes:     g(c,'notes')
+    };
+    // Normalise installation status values
+    const instMap={'installed':'Installed','in storage':'In Storage','storage':'In Storage','retired':'Retired'};
+    row.installStatus = instMap[row.installStatus.toLowerCase()] || row.installStatus || 'Installed';
+    // Normalise print status values
+    const printMap={'ok':'OK','blocked':'Blocked','unrecoverable':'Unrecoverable'};
+    row.printStatus = printMap[row.printStatus.toLowerCase()] || row.printStatus || 'OK';
+    if(row.brand&&row.serial)rows.push(row);
+  }
+  if(!rows.length){showPHImportResult('error','No valid rows found. Make sure the file has Brand and Serial columns.');return;}
+  showPHImportResult('preview','Found '+rows.length+' printhead(s) — review and confirm:',rows);
+}
+
+function showPHImportResult(type,msg,rows){
+  const el=document.getElementById('ph-import-preview');
+  if(type==='error'){el.innerHTML='<div class="alert-box alert-danger">'+msg+'</div>';return;}
+  if(type==='success'){el.innerHTML='<div class="alert-box alert-success">'+msg+'</div>';return;}
+  let html='<div class="alert-box alert-info" style="margin-bottom:12px">'+msg+'</div>';
+  html+='<div style="overflow-x:auto"><table><thead><tr><th>Brand</th><th>Model</th><th>Serial</th><th>Install status</th><th>Print status</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const ex=printheads.find(p=>p.serial.toLowerCase()===r.serial.toLowerCase());
+    html+='<tr><td>'+r.brand+'</td><td>'+r.model+'</td><td style="font-family:monospace;font-size:12px">'+r.serial+'</td><td>'+r.installStatus+'</td><td>'+r.printStatus+'</td>'+
+      '<td>'+(ex?'<span style="color:#854f0b;font-size:12px">Update</span>':'<span style="color:#3b6d11;font-size:12px">Add new</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<div style="margin-top:12px;display:flex;gap:8px">'+
+    '<button class="btn btn-primary" onclick="commitPHImport(window._phImportRows)">Import '+rows.length+' printhead(s)</button>'+
+    '<button class="btn" onclick="document.getElementById(\'ph-import-preview\').innerHTML=\'\'">Cancel</button></div>';
+  el.innerHTML=html;
+  window._phImportRows=rows;
+}
+
+function commitPHImport(rows){
+  let added=0,updated=0;
+  rows.forEach(r=>{
+    const ex=printheads.find(p=>p.serial.toLowerCase()===r.serial.toLowerCase());
+    if(ex){
+      // Update fields but preserve existing cleaning history
+      ex.brand=r.brand;ex.model=r.model;ex.serial=r.serial;
+      ex.installStatus=r.installStatus;ex.printStatus=r.printStatus;
+      ex.location=r.location;ex.dateInstalled=r.dateInstalled;ex.notes=r.notes;
+      updated++;
+    }else{
+      printheads.push({id:uid(),...r,cleans:[]});
+      added++;
+    }
+  });
+  logEntry('PH-IMPORT','Printhead CSV import: '+added+' added, '+updated+' updated');
+  scheduleSave();
+  showPHImportResult('success','Import complete: '+added+' printhead(s) added, '+updated+' updated. Cleaning history preserved for existing records.');
+  document.getElementById('ph-csv-file').value='';
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────
