@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Management System</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f3; color: #1a1a18; font-size: 14px; }
+  .app { padding: 1.5rem; max-width: 1300px; margin: 0 auto; }
+
+  /* ── Connection bar ── */
+  #conn-bar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: #fff; border: 1px solid #e0dfd8; border-radius: 8px; margin-bottom: 1rem; font-size: 12px; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #b4b2a9; flex-shrink: 0; }
+  .conn-dot.ok { background: #639922; }
+  .conn-dot.err { background: #E24B4A; }
+  .conn-dot.busy { background: #BA7517; animation: pulse .8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  #conn-text { flex: 1; color: #73726c; }
+  #conn-text strong { color: #1a1a18; }
+
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 1rem; color: #1a1a18; }
+  .nav { display: flex; gap: 2px; margin-bottom: 1.5rem; background: #fff; border-radius: 10px 10px 0 0; padding: 0 8px; border: 1px solid #e0dfd8; border-bottom: none; flex-wrap: wrap; }
+  .nav-btn { padding: 10px 15px; border: none; background: none; cursor: pointer; color: #73726c; font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; white-space: nowrap; }
+  .nav-btn.active { color: #1a1a18; border-bottom-color: #1a1a18; font-weight: 600; }
+  .nav-btn.ph-tab.active { border-bottom-color: #185fa5; color: #185fa5; }
+  .nav-btn:hover:not(.active) { color: #1a1a18; }
+  .nav-divider { width: 1px; background: #e0dfd8; margin: 8px 4px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat-card { background: #fff; border-radius: 8px; padding: 14px 16px; border: 1px solid #e0dfd8; }
+  .stat-label { font-size: 12px; color: #73726c; margin-bottom: 6px; }
+  .stat-val { font-size: 24px; font-weight: 600; }
+  .stat-val.danger  { color: #a32d2d; }
+  .stat-val.warning { color: #854f0b; }
+  .stat-val.success { color: #3b6d11; }
+  .stat-val.info    { color: #185fa5; }
+
+  .card { background: #fff; border: 1px solid #e0dfd8; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-weight: 600; font-size: 14px; margin-bottom: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 9px 12px; font-weight: 500; color: #73726c; font-size: 12px; border-bottom: 1px solid #e0dfd8; background: #fafaf8; }
+  td { padding: 9px 12px; border-bottom: 1px solid #e0dfd8; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf8; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-ok       { background: #eaf3de; color: #3b6d11; }
+  .badge-low      { background: #faeeda; color: #854f0b; }
+  .badge-out      { background: #fcebeb; color: #a32d2d; }
+  .badge-disc     { background: #f1efe8; color: #5f5e5a; }
+  .badge-order    { background: #e6f1fb; color: #185fa5; }
+  .badge-installed{ background: #eaf3de; color: #3b6d11; }
+  .badge-storage  { background: #e6f1fb; color: #185fa5; }
+  .badge-retired  { background: #f1efe8; color: #5f5e5a; }
+
+  .form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: #73726c; font-weight: 500; }
+  .field input, .field select, .field textarea {
+    padding: 8px 10px; border: 1px solid #d3d1c7; border-radius: 6px;
+    background: #fff; color: #1a1a18; font-size: 13px; font-family: inherit; outline: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #888780; box-shadow: 0 0 0 3px rgba(136,135,128,.12); }
+  .field textarea { resize: vertical; min-height: 60px; }
+
+  .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid #d3d1c7; background: #fff; color: #1a1a18; cursor: pointer; font-size: 13px; font-family: inherit; transition: background .15s; }
+  .btn:hover { background: #f1efe8; }
+  .btn-primary { background: #1a1a18; color: #fff; border-color: #1a1a18; }
+  .btn-primary:hover { background: #333; }
+  .btn-blue { background: #185fa5; color: #fff; border-color: #185fa5; }
+  .btn-blue:hover { background: #0c447c; }
+  .btn-success { background: #3b6d11; color: #fff; border-color: #3b6d11; }
+  .btn-success:hover { background: #27500a; }
+  .btn-danger { color: #a32d2d; border-color: #f09595; }
+  .btn-danger:hover { background: #fcebeb; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  .actions-row { display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+  .actions-row .spacer { flex: 1; }
+
+  .progress-wrap { width: 100%; height: 6px; background: #e0dfd8; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  .quick-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
+  .quick-row .field { flex: 1; min-width: 140px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+  .modal { background: #fff; border-radius: 12px; border: 1px solid #d3d1c7; padding: 1.5rem; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.18); }
+  .modal-lg { max-width: 720px; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; }
+  .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e0dfd8; }
+
+  .alert-box { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 8px; }
+  .alert-warn    { background: #faeeda; color: #854f0b; border: 1px solid #fac775; }
+  .alert-danger  { background: #fcebeb; color: #a32d2d; border: 1px solid #f7c1c1; }
+  .alert-info    { background: #e6f1fb; color: #185fa5; border: 1px solid #b5d4f4; }
+  .alert-success { background: #eaf3de; color: #3b6d11; border: 1px solid #c0dd97; }
+
+  .comment-input { width: 100%; padding: 5px 8px; border: 1px solid #e0dfd8; border-radius: 6px; background: transparent; color: #1a1a18; font-size: 12px; font-family: inherit; outline: none; }
+  .comment-input:focus { border-color: #888780; background: #fff; }
+  .comment-input::placeholder { color: #b4b2a9; }
+
+  .log-row { font-size: 12px; color: #73726c; padding: 7px 0; border-bottom: 1px solid #e0dfd8; display: flex; gap: 12px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-ts   { min-width: 130px; color: #b4b2a9; }
+  .log-type { min-width: 80px; font-weight: 600; color: #5f5e5a; }
+
+  .clean-entry { background: #fafaf8; border: 1px solid #e0dfd8; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+  .clean-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .clean-meta { font-size: 12px; color: #73726c; }
+
+  .ps-ok      { color: #3b6d11; font-weight: 600; }
+  .ps-blocked { color: #854f0b; font-weight: 600; }
+  .ps-unrecov { color: #a32d2d; font-weight: 600; }
+
+  .import-zone { border: 2px dashed #d3d1c7; border-radius: 10px; padding: 2rem; text-align: center; color: #73726c; cursor: pointer; transition: border-color .2s, background .2s; }
+  .import-zone:hover, .import-zone.drag { border-color: #185fa5; background: rgba(230,241,251,.2); color: #185fa5; }
+  .import-zone input[type=file] { display: none; }
+
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #b4b2a9; margin: 1rem 0 8px; }
+  .hint { font-size: 12px; color: #73726c; margin-top: 8px; }
+
+  /* Setup screen */
+  #setup-screen { position: fixed; inset: 0; background: #f5f5f3; display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+  #setup-screen .box { background: #fff; border: 1px solid #e0dfd8; border-radius: 14px; padding: 2rem; max-width: 500px; width: 100%; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+
+  /* Loading spinner */
+  #loading-screen { position: fixed; inset: 0; background: #f5f5f3; display: flex; align-items: center; justify-content: center; z-index: 199; flex-direction: column; gap: 12px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #e0dfd8; border-top-color: #1a1a18; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
+    .nav-btn { padding: 8px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div id="setup-screen" style="display:none">
+  <div class="box">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:0.5rem">📦 Stock Manager</h2>
+    <p style="color:#73726c;margin-bottom:1.5rem;font-size:13px">
+      Enter your Google Apps Script URL to connect to your shared data store.
+      You only need to do this once — it's saved in your browser.
+      See <strong>SETUP.html</strong> for instructions on creating the URL.
+    </p>
+    <div class="field" style="margin-bottom:1rem">
+      <label>Apps Script Web App URL</label>
+      <input type="url" id="setup-url" placeholder="https://script.google.com/macros/s/.../exec" style="font-family:monospace;font-size:12px">
+    </div>
+    <div id="setup-error" style="color:#a32d2d;font-size:13px;margin-bottom:12px;display:none"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="connectWithUrl()">Connect</button>
+      <button class="btn" onclick="useLocalOnly()" title="Use without cloud — data stays in this browser only">Use locally (no cloud)</button>
+    </div>
+    <p style="font-size:11px;color:#b4b2a9;margin-top:12px">The URL is stored only in your browser and never shared with anyone else.</p>
+  </div>
+</div>
+
+<!-- ══ LOADING SCREEN ══ -->
+<div id="loading-screen" style="display:none">
+  <div class="spinner"></div>
+  <span style="color:#73726c;font-size:13px">Connecting to Google Sheets…</span>
+</div>
+
+<div class="app" id="main-app" style="display:none">
+  <h1>📦 Stock & Printhead Management</h1>
+
+  <!-- Connection status bar -->
+  <div id="conn-bar">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span id="conn-text">Connecting…</span>
+    <button class="btn btn-sm" onclick="reloadFromCloud()" title="Reload data from cloud">↺ Reload</button>
+    <button class="btn btn-sm" onclick="changeUrl()">⚙ Change URL</button>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button class="nav-btn" onclick="showTab('inventory',this)">Inventory</button>
+    <button class="nav-btn" onclick="showTab('quick',this)">Quick Action</button>
+    <button class="nav-btn" onclick="showTab('add',this)">Add Product</button>
+    <button class="nav-btn" onclick="showTab('import',this)">Import CSV</button>
+    <button class="nav-btn" onclick="showTab('log',this)">Activity Log</button>
+    <div class="nav-divider"></div>
+    <button class="nav-btn ph-tab" onclick="showTab('printheads',this)">🖨 Printheads</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="tab-dashboard" class="section active">
+    <div class="stat-grid" id="stats"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div class="card"><div class="card-title">Stock level alerts</div><div id="alerts-list"></div></div>
+      <div class="card"><div class="card-title">Printhead status summary</div><div id="ph-summary"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Stock levels (% of max) <span style="font-size:11px;font-weight:400;color:#b4b2a9;margin-left:8px">| = minimum threshold</span></div>
+      <div id="stock-bars"></div>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div id="tab-inventory" class="section">
+    <div class="actions-row">
+      <input type="text" id="search-box" placeholder="Search by name, model, supplier…"
+        style="padding:7px 12px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18;font-size:13px;width:260px;font-family:inherit;outline:none" oninput="renderInventory()">
+      <select id="filter-status"
+        style="padding:7px 10px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18;font-size:13px;font-family:inherit;" onchange="renderInventory()">
+        <option value="">All statuses</option>
+        <option value="Active">Active</option><option value="Low Stock">Low Stock</option>
+        <option value="Out of Stock">Out of Stock</option><option value="On Order">On Order</option>
+        <option value="Discontinued">Discontinued</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn btn-success" onclick="exportCSV()">⬇ Export to CSV</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr>
+          <th>Product</th><th>Supplier</th><th>Model / Serial</th>
+          <th>Stock</th><th>Min</th><th>Max</th><th>Cost</th>
+          <th>Status</th><th>Comment</th><th>Location</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="inv-tbody"></tbody>
+      </table>
+    </div>
+    <p class="hint">Data is saved to Google Sheets. Export CSV to open in Excel.</p>
+  </div>
+
+  <!-- QUICK ACTION -->
+  <div id="tab-quick" class="section">
+    <div class="card">
+      <div class="card-title">Record usage or status change</div>
+      <div class="quick-row">
+        <div class="field"><label>Product</label>
+          <select id="qa-product" onchange="renderQAAction()"><option value="">— select product —</option></select>
+        </div>
+        <div class="field"><label>Action</label>
+          <select id="qa-action" onchange="renderQAAction()">
+            <option value="use">Use / Consume</option>
+            <option value="restock">Restock / Add stock</option>
+            <option value="status">Change status</option>
+          </select>
+        </div>
+      </div>
+      <div id="qa-detail"></div>
+      <div id="qa-preview" style="font-size:13px;color:#73726c;margin-bottom:12px;min-height:20px"></div>
+      <button class="btn btn-primary" onclick="commitQuickAction()">Apply</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Bulk adjust stock</div>
+      <p style="font-size:13px;color:#73726c;margin-bottom:12px">Positive = add stock, negative = remove stock.</p>
+      <table>
+        <thead><tr><th>Product</th><th>Current</th><th>Adjust by</th><th>Result</th></tr></thead>
+        <tbody id="bulk-tbody"></tbody>
+      </table>
+      <div style="margin-top:12px;text-align:right">
+        <button class="btn btn-primary" onclick="commitBulk()">Apply all adjustments</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD PRODUCT -->
+  <div id="tab-add" class="section">
+    <div class="card" style="max-width:600px">
+      <div class="card-title" id="add-form-title">Add new product</div>
+      <input type="hidden" id="edit-id">
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="field" style="grid-column:1/-1"><label>Product name *</label><input type="text" id="f-name" placeholder="e.g. HP LaserJet Toner"></div>
+        <div class="field"><label>Supplier *</label><input type="text" id="f-supplier" placeholder="e.g. Officeworks"></div>
+        <div class="field"><label>Category</label><input type="text" id="f-category" placeholder="e.g. Consumables"></div>
+        <div class="field"><label>Model number</label><input type="text" id="f-model" placeholder="e.g. CF410A"></div>
+        <div class="field"><label>Serial number</label><input type="text" id="f-serial"></div>
+        <div class="field"><label>SKU / Part number</label><input type="text" id="f-sku"></div>
+        <div class="field"><label>Unit cost ($)</label><input type="number" id="f-cost" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label>Current stock *</label><input type="number" id="f-qty" min="0" value="0"></div>
+        <div class="field"><label>Min stock level *</label><input type="number" id="f-min" min="0" value="5"></div>
+        <div class="field"><label>Max stock level</label><input type="number" id="f-max" min="0" value="50"></div>
+        <div class="field"><label>Status</label>
+          <select id="f-status"><option>Active</option><option>On Order</option><option>Discontinued</option></select>
+        </div>
+        <div class="field"><label>Location / bin</label><input type="text" id="f-location" placeholder="e.g. Shelf B2"></div>
+        <div class="field" style="grid-column:1/-1"><label>Notes</label><textarea id="f-notes"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveProduct()">Save product</button>
+        <button class="btn" onclick="clearForm()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT CSV -->
+  <div id="tab-import" class="section">
+    <div class="card" style="max-width:640px">
+      <div class="card-title">Import stock data from CSV</div>
+      <p style="font-size:13px;color:#73726c;margin-bottom:1rem">
+        Upload a CSV previously exported from this app. Columns must match:
+        <strong>Name, Supplier, Category, Model, Serial, SKU, Unit Cost ($), Stock Qty, Min Stock, Max Stock, Status, Comment, Location, Notes</strong>.
+        Existing products (matched by name) will be updated; new names will be added.
+      </p>
+      <div class="import-zone" id="import-zone" onclick="document.getElementById('csv-file').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+        <input type="file" id="csv-file" accept=".csv" onchange="handleFileSelect(this)">
+        <div style="font-size:2rem;margin-bottom:8px">📂</div>
+        <div style="font-weight:500;margin-bottom:4px">Click to choose a CSV file, or drag and drop</div>
+        <div style="font-size:12px">Files are named stock-export-YYYY-MM-DD.csv</div>
+      </div>
+      <div id="import-preview" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <!-- ACTIVITY LOG -->
+  <div id="tab-log" class="section">
+    <div class="actions-row">
+      <button class="btn btn-success" onclick="exportLogCSV()">⬇ Export log to CSV</button>
+      <div class="spacer"></div>
+      <button class="btn btn-danger btn-sm" onclick="clearLog()">Clear log</button>
+    </div>
+    <div class="card" style="padding:0.75rem 1.25rem"><div id="log-list"></div></div>
+  </div>
+
+  <!-- PRINTHEADS -->
+  <div id="tab-printheads" class="section">
+    <div class="stat-grid" id="ph-stats"></div>
+    <div class="actions-row">
+      <input type="text" id="ph-search" placeholder="Search by brand, model, serial…"
+        style="padding:7px 12px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18;font-size:13px;width:260px;font-family:inherit;outline:none" oninput="renderPrintheads()">
+      <select id="ph-filter-install"
+        style="padding:7px 10px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18;font-size:13px;font-family:inherit;" onchange="renderPrintheads()">
+        <option value="">All installation</option>
+        <option value="Installed">Installed</option><option value="In Storage">In Storage</option><option value="Retired">Retired</option>
+      </select>
+      <select id="ph-filter-print"
+        style="padding:7px 10px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18;font-size:13px;font-family:inherit;" onchange="renderPrintheads()">
+        <option value="">All print status</option>
+        <option value="OK">OK</option><option value="Blocked">Blocked</option><option value="Unrecoverable">Unrecoverable</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn btn-success" onclick="exportPHCSV()">⬇ Export to CSV</button>
+      <button class="btn btn-blue" onclick="openAddPH()">+ Add Printhead</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr>
+          <th>Brand</th><th>Model</th><th>Serial</th>
+          <th>Installation</th><th>Print status</th>
+          <th>Last cleaned</th><th>Cleans</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="ph-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- STOCK EDIT MODAL -->
+<div class="overlay" id="edit-modal" style="display:none" onclick="if(event.target===this)closeModal('edit-modal')">
+  <div class="modal">
+    <div class="modal-title">Edit product</div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="field" style="grid-column:1/-1"><label>Product name</label><input type="text" id="m-name"></div>
+      <div class="field"><label>Supplier</label><input type="text" id="m-supplier"></div>
+      <div class="field"><label>Category</label><input type="text" id="m-category"></div>
+      <div class="field"><label>Model number</label><input type="text" id="m-model"></div>
+      <div class="field"><label>Serial number</label><input type="text" id="m-serial"></div>
+      <div class="field"><label>SKU</label><input type="text" id="m-sku"></div>
+      <div class="field"><label>Unit cost ($)</label><input type="number" id="m-cost" min="0" step="0.01"></div>
+      <div class="field"><label>Min stock</label><input type="number" id="m-min" min="0"></div>
+      <div class="field"><label>Max stock</label><input type="number" id="m-max" min="0"></div>
+      <div class="field"><label>Status</label>
+        <select id="m-status"><option>Active</option><option>Low Stock</option><option>Out of Stock</option><option>On Order</option><option>Discontinued</option></select>
+      </div>
+      <div class="field"><label>Location</label><input type="text" id="m-location"></div>
+      <div class="field" style="grid-column:1/-1"><label>Notes</label><textarea id="m-notes"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteProduct(currentEditId)">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeModal('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRINTHEAD ADD/EDIT MODAL -->
+<div class="overlay" id="ph-edit-modal" style="display:none" onclick="if(event.target===this)closeModal('ph-edit-modal')">
+  <div class="modal">
+    <div class="modal-title" id="ph-modal-title">Add printhead</div>
+    <input type="hidden" id="ph-edit-id">
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="field"><label>Brand *</label><input type="text" id="ph-brand" placeholder="e.g. Epson"></div>
+      <div class="field"><label>Model *</label><input type="text" id="ph-model" placeholder="e.g. DX5"></div>
+      <div class="field" style="grid-column:1/-1"><label>Serial number *</label><input type="text" id="ph-serial" placeholder="e.g. SN-00123456"></div>
+      <div class="field"><label>Installation status</label>
+        <select id="ph-install"><option value="Installed">Installed</option><option value="In Storage">In Storage</option><option value="Retired">Retired</option></select>
+      </div>
+      <div class="field"><label>Print status</label>
+        <select id="ph-print"><option value="OK">OK</option><option value="Blocked">Blocked</option><option value="Unrecoverable">Unrecoverable</option></select>
+      </div>
+      <div class="field"><label>Location / machine</label><input type="text" id="ph-location" placeholder="e.g. Printer A, Bay 3"></div>
+      <div class="field"><label>Date installed</label><input type="date" id="ph-date-installed"></div>
+      <div class="field" style="grid-column:1/-1"><label>Notes</label><textarea id="ph-notes"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="ph-delete-btn" onclick="deletePH()" style="display:none">Delete</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeModal('ph-edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="savePH()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRINTHEAD DETAIL / CLEAN MODAL -->
+<div class="overlay" id="ph-detail-modal" style="display:none" onclick="if(event.target===this)closeModal('ph-detail-modal')">
+  <div class="modal modal-lg">
+    <div class="modal-title" id="ph-detail-title">Printhead detail</div>
+    <div id="ph-detail-info" style="margin-bottom:1rem"></div>
+
+    <div class="section-label">Update status</div>
+    <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:140px"><label>Print status</label>
+        <select id="pd-print-status"><option>OK</option><option>Blocked</option><option>Unrecoverable</option></select>
+      </div>
+      <div class="field" style="flex:1;min-width:140px"><label>Installation status</label>
+        <select id="pd-install-status"><option>Installed</option><option>In Storage</option><option>Retired</option></select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-primary btn-sm" onclick="saveDetailStatus(event)">Update status</button>
+      </div>
+    </div>
+
+    <div class="section-label">Log a cleaning attempt</div>
+    <div class="form-grid-3" style="margin-bottom:10px">
+      <div class="field"><label>Date *</label><input type="date" id="cl-date"></div>
+      <div class="field"><label>Operator *</label><input type="text" id="cl-operator" placeholder="Name or initials"></div>
+      <div class="field"><label>Result</label>
+        <select id="cl-result"><option>Improved</option><option>No change</option><option>Cleared</option><option>Worse</option></select>
+      </div>
+      <div class="field" style="grid-column:1/-1"><label>Comment</label>
+        <input type="text" id="cl-comment" placeholder="e.g. Ran 3 head cleans, nozzle check improved 80%">
+      </div>
+    </div>
+    <div style="margin-bottom:1.25rem">
+      <button class="btn btn-blue btn-sm" onclick="addClean()">+ Log clean</button>
+    </div>
+
+    <div class="section-label">Cleaning history</div>
+    <div id="ph-clean-history"></div>
+
+    <div class="modal-footer" style="border-top:none;padding-top:0">
+      <button class="btn" onclick="closeModal('ph-detail-modal')">Close</button>
+      <button class="btn btn-sm" onclick="openEditPH(currentPHId)">Edit details</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────
+let products=[], activityLog=[], printheads=[];
+let currentEditId=null, currentPHId=null;
+let scriptUrl='', localMode=false;
+let saveTimer=null;
+
+const URL_KEY='stockmgr-script-url';
+
+// ── SETUP & CONNECTION ─────────────────────────────────────
+function init(){
+  const saved=localStorage.getItem(URL_KEY);
+  if(saved==='LOCAL'){
+    localMode=true;
+    loadLocal();
+    showApp();
+    setConn('local','Local mode — data saved in this browser only');
+    return;
+  }
+  if(saved){
+    scriptUrl=saved;
+    showLoading(true);
+    loadFromCloud().then(()=>{showLoading(false);showApp();}).catch(()=>{showLoading(false);showSetup();});
+    return;
+  }
+  showSetup();
+}
+
+function showSetup(){ document.getElementById('setup-screen').style.display='flex'; }
+function showLoading(on){ document.getElementById('loading-screen').style.display=on?'flex':'none'; }
+function showApp(){
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('main-app').style.display='block';
+  renderDashboard();
+}
+
+async function connectWithUrl(){
+  const url=document.getElementById('setup-url').value.trim();
+  const errEl=document.getElementById('setup-error');
+  if(!url){errEl.textContent='Please enter the Apps Script URL.';errEl.style.display='block';return;}
+  if(!url.includes('script.google.com')){errEl.textContent='This does not look like a Google Apps Script URL.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  scriptUrl=url;
+  showLoading(true);
+  document.getElementById('setup-screen').style.display='none';
+  try{
+    await loadFromCloud();
+    localStorage.setItem(URL_KEY,url);
+    showLoading(false);
+    showApp();
+  }catch(e){
+    showLoading(false);
+    document.getElementById('setup-screen').style.display='flex';
+    errEl.textContent='Could not connect. Check the URL and make sure the Apps Script is deployed with "Anyone" access.';
+    errEl.style.display='block';
+  }
+}
+
+function useLocalOnly(){
+  localMode=true;
+  localStorage.setItem(URL_KEY,'LOCAL');
+  loadLocal();
+  showApp();
+  setConn('local','Local mode — data saved in this browser only');
+}
+
+function changeUrl(){
+  if(!confirm('Change the Apps Script URL? Your current data will remain in the cloud.'))return;
+  localStorage.removeItem(URL_KEY);
+  location.reload();
+}
+
+// ── CLOUD READ / WRITE ─────────────────────────────────────
+async function loadFromCloud(){
+  setConn('busy','Loading from Google Sheets…');
+  const res=await fetch(scriptUrl+'?t='+Date.now());
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  if(!data.ok)throw new Error(data.error||'Unknown error');
+  products   = data.products   || [];
+  printheads = data.printheads || [];
+  activityLog= data.log        || [];
+  if(!products.length&&!printheads.length)seedData();
+  setConn('ok','Connected to Google Sheets'+(data.lastUpdated?' · last saved '+new Date(data.lastUpdated).toLocaleString('en-AU'):''));
+}
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveToCloud(),800);
+}
+
+async function saveToCloud(){
+  if(localMode){saveLocal();return;}
+  setConn('busy','Saving…');
+  try{
+    // Using text/plain to avoid CORS preflight
+    const res=await fetch(scriptUrl,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({products,printheads,log:activityLog})
+    });
+    const data=await res.json();
+    if(!data.ok)throw new Error(data.error);
+    setConn('ok','Saved · '+new Date().toLocaleTimeString('en-AU'));
+  }catch(e){
+    setConn('err','Save failed — '+e.message+'. Data queued, will retry on next action.');
+    console.error('Save error:',e);
+  }
+}
+
+async function reloadFromCloud(){
+  if(localMode){setConn('local','Local mode — reloaded from browser');loadLocal();renderAll();return;}
+  try{
+    await loadFromCloud();
+    renderAll();
+  }catch(e){
+    setConn('err','Reload failed: '+e.message);
+  }
+}
+
+function saveLocal(){
+  try{localStorage.setItem('stock-data',JSON.stringify({products,printheads,log:activityLog}));}catch(e){}
+  setConn('local','Local mode — saved in this browser');
+}
+function loadLocal(){
+  try{const r=localStorage.getItem('stock-data');if(r){const d=JSON.parse(r);products=d.products||[];printheads=d.printheads||[];activityLog=d.log||[];}}catch(e){}
+  if(!products.length&&!printheads.length)seedData();
+}
+
+function setConn(state,msg){
+  const dot=document.getElementById('conn-dot');
+  const txt=document.getElementById('conn-text');
+  dot.className='conn-dot'+(state==='ok'?' ok':state==='err'?' err':state==='busy'?' busy':'');
+  txt.innerHTML=msg;
+}
+
+function renderAll(){
+  const active=document.querySelector('.section.active');
+  if(active){
+    const id=active.id.replace('tab-','');
+    const map={dashboard:renderDashboard,inventory:renderInventory,quick:renderQuick,log:renderLog,printheads:renderPrintheads};
+    if(map[id])map[id]();
+  }
+}
+
+// ── SEED DATA ──────────────────────────────────────────────
+function seedData(){
+  const n=Date.now();
+  products=[
+    {id:n+1,name:'HP LaserJet Toner CF410A',supplier:'Officeworks',category:'Consumables',model:'CF410A',serial:'',sku:'OW-CF410A',cost:89.95,qty:3,min:5,max:20,status:'Low Stock',location:'Shelf B2',notes:'',comment:'Reorder placed 12 Mar'},
+    {id:n+2,name:'Cat6 Ethernet Cable 2m',supplier:'Jaycar',category:'Networking',model:'WN8512',serial:'',sku:'JC-WN8512',cost:9.95,qty:15,min:10,max:50,status:'Active',location:'Cabinet 3',notes:'',comment:''},
+    {id:n+3,name:'Dell 24" Monitor P2422H',supplier:'Dell Australia',category:'Hardware',model:'P2422H',serial:'SN4821XZ',sku:'DELL-P2422H',cost:449.00,qty:0,min:2,max:8,status:'Out of Stock',location:'Storeroom A',notes:'',comment:'Awaiting delivery'},
+  ];
+  printheads=[
+    {id:n+10,brand:'Epson',model:'DX5',serial:'SN-0010234',installStatus:'Installed',printStatus:'OK',location:'Printer A',dateInstalled:'2025-06-01',notes:'',cleans:[{id:n+20,date:'2025-09-14',operator:'JD',result:'Improved',comment:'Ran 2 head cleans'}]},
+  ];
+  logEntry('INFO','Sample data loaded — replace with your own data');
+  scheduleSave();
+}
+
+function uid(){ return Date.now()+Math.floor(Math.random()*99999); }
+function statusFromQty(qty,min){ return qty===0?'Out of Stock':qty<=min?'Low Stock':'Active'; }
+function logEntry(type,msg){ activityLog.unshift({ts:new Date().toLocaleString('en-AU'),type,msg}); }
+
+function showTab(t,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(btn)btn.classList.add('active');
+  const map={dashboard:renderDashboard,inventory:renderInventory,quick:renderQuick,log:renderLog,printheads:renderPrintheads};
+  if(map[t])map[t]();
+}
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+
+// ── CSV HELPERS ────────────────────────────────────────────
+function esc(v){ const s=String(v==null?'':v);return(s.includes(',')||s.includes('"')||s.includes('\n'))?'"'+s.replace(/"/g,'""')+'"':s; }
+function dlCSV(filename,rows){
+  const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(esc).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href);
+}
+function exportCSV(){
+  const h=['Name','Supplier','Category','Model','Serial','SKU','Unit Cost ($)','Stock Qty','Min Stock','Max Stock','Status','Comment','Location','Notes'];
+  dlCSV('stock-export-'+new Date().toISOString().slice(0,10)+'.csv',[h,...products.map(p=>[p.name,p.supplier,p.category,p.model,p.serial,p.sku,p.cost,p.qty,p.min,p.max,p.status,p.comment,p.location,p.notes])]);
+  logEntry('EXPORT','Stock exported ('+products.length+' products)');scheduleSave();
+}
+function exportLogCSV(){
+  dlCSV('stock-log-'+new Date().toISOString().slice(0,10)+'.csv',[['Timestamp','Type','Detail'],...activityLog.map(e=>[e.ts,e.type,e.msg])]);
+}
+function exportPHCSV(){
+  const h=['Brand','Model','Serial','Installation Status','Print Status','Location','Date Installed','Notes','Total Cleans','Last Clean Date','Last Operator'];
+  dlCSV('printheads-export-'+new Date().toISOString().slice(0,10)+'.csv',[h,...printheads.map(p=>{
+    const last=(p.cleans||[]).length?(p.cleans[p.cleans.length-1]):null;
+    return[p.brand,p.model,p.serial,p.installStatus,p.printStatus,p.location,p.dateInstalled,p.notes,(p.cleans||[]).length,last?last.date:'',last?last.operator:''];
+  })]);
+  logEntry('EXPORT','Printheads exported');scheduleSave();
+}
+
+// ── CSV IMPORT ─────────────────────────────────────────────
+function handleDrop(e){e.preventDefault();document.getElementById('import-zone').classList.remove('drag');const f=e.dataTransfer.files[0];if(f)parseCSVFile(f);}
+function handleFileSelect(i){if(i.files[0])parseCSVFile(i.files[0]);}
+function parseCSVFile(f){const r=new FileReader();r.onload=e=>previewCSV(e.target.result);r.readAsText(f,'UTF-8');}
+function parseCSVLine(line){
+  const res=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}else if(c===','&&!inQ){res.push(cur.trim());cur='';}else cur+=c;}
+  res.push(cur.trim());return res;
+}
+function previewCSV(text){
+  const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2){showImportResult('error','File is empty or invalid.');return;}
+  const hdr=parseCSVLine(lines[0]).map(h=>h.toLowerCase().trim());
+  if(hdr.indexOf('name')===-1||hdr.indexOf('supplier')===-1){showImportResult('error','CSV is missing required columns "Name" and "Supplier". Ensure this was exported from this app.');return;}
+  const g=(cols,name,def='')=>{const i=hdr.indexOf(name);return i>=0&&cols[i]!==undefined?cols[i].trim():def;};
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim())continue;
+    const c=parseCSVLine(lines[i]);
+    const row={name:g(c,'name'),supplier:g(c,'supplier'),category:g(c,'category'),model:g(c,'model'),serial:g(c,'serial'),sku:g(c,'sku'),
+      cost:parseFloat(g(c,'unit cost ($)'))||0,qty:parseInt(g(c,'stock qty'))||0,min:parseInt(g(c,'min stock'))||0,max:parseInt(g(c,'max stock'))||0,
+      status:g(c,'status','Active'),comment:g(c,'comment'),location:g(c,'location'),notes:g(c,'notes')};
+    if(row.name)rows.push(row);
+  }
+  if(!rows.length){showImportResult('error','No data rows found.');return;}
+  showImportResult('preview','Found '+rows.length+' product(s) — review and confirm:',rows);
+}
+function showImportResult(type,msg,rows){
+  const el=document.getElementById('import-preview');
+  if(type==='error'){el.innerHTML='<div class="alert-box alert-danger">'+msg+'</div>';return;}
+  if(type==='success'){el.innerHTML='<div class="alert-box alert-success">'+msg+'</div>';return;}
+  let html='<div class="alert-box alert-info" style="margin-bottom:12px">'+msg+'</div>';
+  html+='<div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Supplier</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const ex=products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
+    html+='<tr><td>'+r.name+'</td><td>'+r.supplier+'</td><td>'+r.qty+'</td><td>'+r.status+'</td><td>'+(ex?'<span style="color:#854f0b;font-size:12px">Update</span>':'<span style="color:#3b6d11;font-size:12px">Add new</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" onclick="commitImport(window._importRows)">Import '+rows.length+' product(s)</button><button class="btn" onclick="document.getElementById(\'import-preview\').innerHTML=\'\'">Cancel</button></div>';
+  el.innerHTML=html; window._importRows=rows;
+}
+function commitImport(rows){
+  let added=0,updated=0;
+  rows.forEach(r=>{
+    const ex=products.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
+    if(ex){Object.assign(ex,r);updated++;}else{products.push({id:uid(),...r,comment:r.comment||''});added++;}
+  });
+  logEntry('IMPORT','CSV import: '+added+' added, '+updated+' updated');
+  scheduleSave();
+  showImportResult('success','Import complete: '+added+' added, '+updated+' updated.');
+  document.getElementById('csv-file').value='';
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────
+function renderDashboard(){
+  const total=products.length,oos=products.filter(p=>p.qty===0).length,
+        low=products.filter(p=>p.qty>0&&p.qty<=p.min).length,ok=products.filter(p=>p.qty>p.min).length;
+  document.getElementById('stats').innerHTML=
+    '<div class="stat-card"><div class="stat-label">Total products</div><div class="stat-val">'+total+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">In stock OK</div><div class="stat-val success">'+ok+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Low stock</div><div class="stat-val warning">'+low+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Out of stock</div><div class="stat-val danger">'+oos+'</div></div>';
+  const alerts=products.filter(p=>p.qty<=p.min&&p.status!=='Discontinued');
+  document.getElementById('alerts-list').innerHTML=alerts.length===0
+    ?'<p style="color:#73726c;font-size:13px">All stock levels are healthy.</p>'
+    :alerts.map(p=>'<div class="alert-box '+(p.qty===0?'alert-danger':'alert-warn')+'" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+        '<div style="flex:1"><strong>'+p.name+'</strong><br><span style="font-size:12px">'+(p.qty===0?'Out of stock':'Only '+p.qty+' left (min '+p.min+')')+'</span>'+
+        (p.comment?'<br><em style="font-size:12px">'+p.comment+'</em>':'')+
+        '</div><span class="badge '+(p.qty===0?'badge-out':'badge-low')+'">'+(p.qty===0?'Out':'Low')+'</span></div>').join('');
+  const phOK=printheads.filter(p=>p.printStatus==='OK').length,phB=printheads.filter(p=>p.printStatus==='Blocked').length,
+        phU=printheads.filter(p=>p.printStatus==='Unrecoverable').length,phI=printheads.filter(p=>p.installStatus==='Installed').length;
+  document.getElementById('ph-summary').innerHTML=
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
+    '<div class="stat-card" style="padding:10px"><div class="stat-label">Installed</div><div class="stat-val info" style="font-size:18px">'+phI+'</div></div>'+
+    '<div class="stat-card" style="padding:10px"><div class="stat-label">Printing OK</div><div class="stat-val success" style="font-size:18px">'+phOK+'</div></div>'+
+    '<div class="stat-card" style="padding:10px"><div class="stat-label">Blocked</div><div class="stat-val warning" style="font-size:18px">'+phB+'</div></div>'+
+    '<div class="stat-card" style="padding:10px"><div class="stat-label">Unrecoverable</div><div class="stat-val danger" style="font-size:18px">'+phU+'</div></div></div>'+
+    (phB>0?'<div class="alert-box alert-warn" style="font-size:12px">'+phB+' printhead(s) blocked</div>':'')+
+    (phU>0?'<div class="alert-box alert-danger" style="font-size:12px">'+phU+' printhead(s) unrecoverable</div>':'');
+  document.getElementById('stock-bars').innerHTML=products.map(p=>{
+    const pct=p.max>0?Math.min(100,Math.round(p.qty/p.max*100)):0;
+    const mp=p.max>0?Math.min(100,Math.round(p.min/p.max*100)):0;
+    const col=p.qty===0?'#E24B4A':p.qty<=p.min?'#BA7517':'#639922';
+    return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>'+p.name+'</span><span style="color:#73726c">'+p.qty+' / '+p.max+'</span></div>'+
+      '<div class="progress-wrap" style="position:relative"><div class="progress-fill" style="width:'+pct+'%;background:'+col+'"></div>'+
+      '<div style="position:absolute;top:0;left:'+mp+'%;height:6px;width:2px;background:#888780;opacity:0.6"></div></div></div>';
+  }).join('')||'<p style="color:#73726c;font-size:13px">No products yet.</p>';
+}
+
+// ── INVENTORY ──────────────────────────────────────────────
+function renderInventory(){
+  const q=(document.getElementById('search-box')?.value||'').toLowerCase();
+  const fs=document.getElementById('filter-status')?.value||'';
+  const bc=s=>s==='Active'?'badge-ok':s==='Low Stock'?'badge-low':s==='Out of Stock'?'badge-out':s==='On Order'?'badge-order':'badge-disc';
+  const rows=products.filter(p=>(!q||[p.name,p.supplier,p.model,p.serial,p.sku,p.category].some(v=>(v||'').toLowerCase().includes(q)))&&(!fs||p.status===fs));
+  document.getElementById('inv-tbody').innerHTML=rows.map(p=>
+    '<tr><td><strong>'+p.name+'</strong><br><span style="font-size:11px;color:#73726c">'+(p.category||'')+'</span></td>'+
+    '<td>'+p.supplier+'</td><td style="font-family:monospace;font-size:12px">'+(p.model||'—')+'<br><span style="color:#73726c">'+(p.serial||'')+'</span></td>'+
+    '<td><strong>'+p.qty+'</strong></td><td style="color:#73726c">'+p.min+'</td><td style="color:#73726c">'+p.max+'</td>'+
+    '<td style="color:#73726c">'+(p.cost>0?'$'+p.cost.toFixed(2):'—')+'</td>'+
+    '<td><span class="badge '+bc(p.status)+'">'+p.status+'</span></td>'+
+    '<td style="min-width:150px"><input class="comment-input" type="text" placeholder="Add comment…" value="'+(p.comment||'').replace(/"/g,'&quot;')+'" onchange="saveComment('+p.id+',this.value)"></td>'+
+    '<td style="font-size:12px;color:#73726c">'+(p.location||'—')+'</td>'+
+    '<td><button class="btn btn-sm" onclick="openEdit('+p.id+')">Edit</button></td></tr>'
+  ).join('')||'<tr><td colspan="11" style="text-align:center;color:#73726c;padding:24px">No products match.</td></tr>';
+}
+function saveComment(id,v){
+  const p=products.find(x=>x.id==id);if(!p)return;
+  const prev=p.comment||'';p.comment=v.trim();
+  if(p.comment!==prev){logEntry('COMMENT',p.name+': comment → "'+(p.comment||'(cleared)')+'"');scheduleSave();}
+}
+
+// ── QUICK ACTION ───────────────────────────────────────────
+function renderQuick(){
+  document.getElementById('qa-product').innerHTML='<option value="">— select product —</option>'+products.map(p=>'<option value="'+p.id+'">'+p.name+' (qty: '+p.qty+')</option>').join('');
+  renderQAAction();renderBulk();
+}
+function renderQAAction(){
+  const a=document.getElementById('qa-action').value;
+  let h=a==='use'?'<div class="field" style="margin-bottom:12px;max-width:180px"><label>Quantity used</label><input type="number" id="qa-qty" min="1" value="1" oninput="updateQAPreview()"></div>':
+         a==='restock'?'<div class="field" style="margin-bottom:12px;max-width:180px"><label>Quantity to add</label><input type="number" id="qa-qty" min="1" value="1" oninput="updateQAPreview()"></div>':
+         '<div class="field" style="margin-bottom:12px;max-width:200px"><label>New status</label><select id="qa-status"><option>Active</option><option>Low Stock</option><option>Out of Stock</option><option>On Order</option><option>Discontinued</option></select></div>';
+  h+='<div class="field" style="margin-bottom:12px;max-width:400px"><label>Comment (optional)</label><input type="text" id="qa-comment" placeholder="e.g. Used in project A…"></div>';
+  document.getElementById('qa-detail').innerHTML=h;updateQAPreview();
+}
+function updateQAPreview(){
+  const pid=document.getElementById('qa-product').value,a=document.getElementById('qa-action').value;
+  if(!pid){document.getElementById('qa-preview').textContent='Select a product to continue.';return;}
+  const p=products.find(x=>x.id==pid);if(!p)return;
+  if(a==='use'){const n=parseInt(document.getElementById('qa-qty')?.value)||0;document.getElementById('qa-preview').innerHTML=p.name+': <strong>'+p.qty+'</strong> → <strong>'+Math.max(0,p.qty-n)+'</strong>';}
+  else if(a==='restock'){const n=parseInt(document.getElementById('qa-qty')?.value)||0;document.getElementById('qa-preview').innerHTML=p.name+': <strong>'+p.qty+'</strong> → <strong>'+(p.qty+n)+'</strong>';}
+  else document.getElementById('qa-preview').textContent=p.name+': status will update';
+}
+function commitQuickAction(){
+  const pid=document.getElementById('qa-product').value;
+  if(!pid){alert('Select a product first.');return;}
+  const p=products.find(x=>x.id==pid);if(!p)return;
+  const a=document.getElementById('qa-action').value,cmt=(document.getElementById('qa-comment')?.value||'').trim();
+  if(a==='use'){
+    const n=parseInt(document.getElementById('qa-qty')?.value)||0;if(n<=0){alert('Enter a valid quantity.');return;}
+    const prev=p.qty;p.qty=Math.max(0,p.qty-n);p.status=statusFromQty(p.qty,p.min);if(cmt)p.comment=cmt;
+    logEntry('USE',p.name+': used '+n+'. '+prev+'→'+p.qty+(cmt?' | "'+cmt+'"':''));
+  }else if(a==='restock'){
+    const n=parseInt(document.getElementById('qa-qty')?.value)||0;if(n<=0){alert('Enter a valid quantity.');return;}
+    const prev=p.qty;p.qty+=n;p.status=statusFromQty(p.qty,p.min);if(cmt)p.comment=cmt;
+    logEntry('RESTOCK',p.name+': +'+n+'. '+prev+'→'+p.qty+(cmt?' | "'+cmt+'"':''));
+  }else{
+    const ns=document.getElementById('qa-status')?.value;p.status=ns;if(cmt)p.comment=cmt;
+    logEntry('STATUS',p.name+': →"'+ns+'"'+(cmt?' | "'+cmt+'"':''));
+  }
+  scheduleSave();renderQuick();alert('Done!');
+}
+function renderBulk(){
+  document.getElementById('bulk-tbody').innerHTML=products.map(p=>
+    '<tr><td>'+p.name+'</td><td>'+p.qty+'</td>'+
+    '<td><input type="number" id="bulk-'+p.id+'" value="0" style="width:80px;padding:4px 8px;border:1px solid #d3d1c7;border-radius:4px;background:#fff;color:#1a1a18;font-size:13px;font-family:inherit;text-align:center" oninput="updateBulkResult('+p.id+','+p.qty+')"></td>'+
+    '<td id="bulk-res-'+p.id+'" style="font-weight:600">'+p.qty+'</td></tr>').join('');
+}
+function updateBulkResult(id,c){const a=parseInt(document.getElementById('bulk-'+id)?.value)||0;document.getElementById('bulk-res-'+id).textContent=Math.max(0,c+a);}
+function commitBulk(){
+  let ch=0;products.forEach(p=>{const a=parseInt(document.getElementById('bulk-'+p.id)?.value)||0;if(a!==0){const prev=p.qty;p.qty=Math.max(0,p.qty+a);p.status=statusFromQty(p.qty,p.min);logEntry('BULK',p.name+': '+(a>0?'+':'')+a+'. '+prev+'→'+p.qty);ch++;}});
+  if(!ch){alert('No adjustments entered.');return;}
+  scheduleSave();renderBulk();alert(ch+' product(s) updated.');
+}
+
+// ── ADD/EDIT STOCK ─────────────────────────────────────────
+function saveProduct(){
+  const name=document.getElementById('f-name').value.trim(),sup=document.getElementById('f-supplier').value.trim();
+  if(!name||!sup){alert('Name and supplier are required.');return;}
+  const eid=document.getElementById('edit-id').value;
+  if(eid){const p=products.find(x=>x.id==eid);if(p){Object.assign(p,gfv('f'));logEntry('EDIT','Updated: '+p.name);}}
+  else{const p={id:uid(),...gfv('f'),comment:''};p.status=statusFromQty(p.qty,p.min);products.push(p);logEntry('ADD','Added: '+p.name);}
+  scheduleSave();clearForm();alert('Saved!');
+}
+function gfv(px){
+  const g=id=>document.getElementById(px+'-'+id)?.value||'';
+  return{name:g('name').trim(),supplier:g('supplier').trim(),category:g('category').trim(),model:g('model').trim(),serial:g('serial').trim(),sku:g('sku').trim(),
+    cost:parseFloat(g('cost'))||0,qty:parseInt(g('qty'))||0,min:parseInt(g('min'))||0,max:parseInt(g('max'))||0,status:g('status')||'Active',location:g('location').trim(),notes:g('notes').trim()};
+}
+function clearForm(){
+  ['name','supplier','category','model','serial','sku','cost','location','notes'].forEach(k=>{const el=document.getElementById('f-'+k);if(el)el.value='';});
+  document.getElementById('f-qty').value='0';document.getElementById('f-min').value='5';document.getElementById('f-max').value='50';
+  document.getElementById('f-status').value='Active';document.getElementById('edit-id').value='';
+  document.getElementById('add-form-title').textContent='Add new product';
+}
+function openEdit(id){
+  const p=products.find(x=>x.id==id);if(!p)return;currentEditId=id;
+  ['name','supplier','category','model','serial','sku','cost','min','max','status','location','notes'].forEach(k=>{const el=document.getElementById('m-'+k);if(el)el.value=p[k]!=null?p[k]:'';});
+  document.getElementById('edit-modal').style.display='flex';
+}
+function saveEdit(){
+  const p=products.find(x=>x.id==currentEditId);if(!p)return;
+  ['name','supplier','category','model','serial','sku','cost','min','max','location','notes'].forEach(k=>{const el=document.getElementById('m-'+k);if(el)p[k]=['cost','min','max'].includes(k)?(parseFloat(el.value)||0):el.value;});
+  p.status=document.getElementById('m-status').value;
+  if(p.status!=='On Order'&&p.status!=='Discontinued')p.status=statusFromQty(p.qty,p.min);
+  logEntry('EDIT','Edited: '+p.name);scheduleSave();closeModal('edit-modal');renderInventory();
+}
+function deleteProduct(id){
+  if(!confirm('Delete this product?'))return;
+  const p=products.find(x=>x.id==id);if(p)logEntry('DELETE','Deleted: '+p.name);
+  products=products.filter(x=>x.id!=id);scheduleSave();closeModal('edit-modal');renderInventory();
+}
+
+// ── LOG ────────────────────────────────────────────────────
+function renderLog(){
+  document.getElementById('log-list').innerHTML=activityLog.length===0
+    ?'<p style="color:#73726c;font-size:13px">No activity yet.</p>'
+    :activityLog.map(e=>'<div class="log-row"><span class="log-ts">'+e.ts+'</span><span class="log-type">'+e.type+'</span><span>'+e.msg+'</span></div>').join('');
+}
+function clearLog(){if(!confirm('Clear all log entries?'))return;activityLog=[];scheduleSave();renderLog();}
+
+// ── PRINTHEADS ─────────────────────────────────────────────
+function phIB(s){return s==='Installed'?'badge-installed':s==='In Storage'?'badge-storage':'badge-retired';}
+function phPC(s){return s==='OK'?'ps-ok':s==='Blocked'?'ps-blocked':'ps-unrecov';}
+
+function renderPrintheads(){
+  const q=(document.getElementById('ph-search')?.value||'').toLowerCase();
+  const fi=document.getElementById('ph-filter-install')?.value||'';
+  const fp=document.getElementById('ph-filter-print')?.value||'';
+  const phOK=printheads.filter(p=>p.printStatus==='OK').length,phB=printheads.filter(p=>p.printStatus==='Blocked').length,
+        phU=printheads.filter(p=>p.printStatus==='Unrecoverable').length,phI=printheads.filter(p=>p.installStatus==='Installed').length;
+  document.getElementById('ph-stats').innerHTML=
+    '<div class="stat-card"><div class="stat-label">Total printheads</div><div class="stat-val">'+printheads.length+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Installed</div><div class="stat-val info">'+phI+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-val warning">'+phB+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Unrecoverable</div><div class="stat-val danger">'+phU+'</div></div>';
+  const rows=printheads.filter(p=>(!q||[p.brand,p.model,p.serial,p.location].some(v=>(v||'').toLowerCase().includes(q)))&&(!fi||p.installStatus===fi)&&(!fp||p.printStatus===fp));
+  document.getElementById('ph-tbody').innerHTML=rows.map(p=>{
+    const cl=p.cleans||[],last=cl.length?cl[cl.length-1].date:'—';
+    return '<tr><td><strong>'+p.brand+'</strong></td><td>'+p.model+'</td><td style="font-family:monospace;font-size:12px">'+p.serial+'</td>'+
+      '<td><span class="badge '+phIB(p.installStatus)+'">'+p.installStatus+'</span></td>'+
+      '<td><span class="'+phPC(p.printStatus)+'">'+p.printStatus+'</span></td>'+
+      '<td style="font-size:12px;color:#73726c">'+last+'</td><td style="font-size:12px;color:#73726c">'+cl.length+'</td>'+
+      '<td style="white-space:nowrap"><button class="btn btn-sm btn-blue" onclick="openPHDetail('+p.id+')">View / Clean</button> <button class="btn btn-sm" onclick="openEditPH('+p.id+')">Edit</button></td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#73726c;padding:24px">No printheads match.</td></tr>';
+}
+function openAddPH(){
+  currentPHId=null;
+  document.getElementById('ph-modal-title').textContent='Add printhead';
+  document.getElementById('ph-edit-id').value='';
+  ['brand','model','serial','location','notes'].forEach(k=>{const el=document.getElementById('ph-'+k);if(el)el.value='';});
+  document.getElementById('ph-install').value='Installed';document.getElementById('ph-print').value='OK';
+  document.getElementById('ph-date-installed').value='';document.getElementById('ph-delete-btn').style.display='none';
+  document.getElementById('ph-edit-modal').style.display='flex';
+}
+function openEditPH(id){
+  const p=printheads.find(x=>x.id==id);if(!p)return;currentPHId=id;
+  document.getElementById('ph-modal-title').textContent='Edit printhead';document.getElementById('ph-edit-id').value=id;
+  ['brand','model','serial','location','notes'].forEach(k=>{const el=document.getElementById('ph-'+k);if(el)el.value=p[k]||'';});
+  document.getElementById('ph-install').value=p.installStatus||'Installed';document.getElementById('ph-print').value=p.printStatus||'OK';
+  document.getElementById('ph-date-installed').value=p.dateInstalled||'';document.getElementById('ph-delete-btn').style.display='inline-block';
+  document.getElementById('ph-edit-modal').style.display='flex';
+}
+function savePH(){
+  const brand=document.getElementById('ph-brand').value.trim(),model=document.getElementById('ph-model').value.trim(),serial=document.getElementById('ph-serial').value.trim();
+  if(!brand||!model||!serial){alert('Brand, model and serial number are required.');return;}
+  const eid=document.getElementById('ph-edit-id').value;
+  if(eid){
+    const p=printheads.find(x=>x.id==eid);
+    if(p){p.brand=brand;p.model=model;p.serial=serial;p.installStatus=document.getElementById('ph-install').value;
+      p.printStatus=document.getElementById('ph-print').value;p.location=document.getElementById('ph-location').value.trim();
+      p.dateInstalled=document.getElementById('ph-date-installed').value;p.notes=document.getElementById('ph-notes').value.trim();
+      logEntry('PH-EDIT','Edited: '+brand+' '+model+' S/N:'+serial);}
+  }else{
+    printheads.push({id:uid(),brand,model,serial,installStatus:document.getElementById('ph-install').value,
+      printStatus:document.getElementById('ph-print').value,location:document.getElementById('ph-location').value.trim(),
+      dateInstalled:document.getElementById('ph-date-installed').value,notes:document.getElementById('ph-notes').value.trim(),cleans:[]});
+    logEntry('PH-ADD','Added: '+brand+' '+model+' S/N:'+serial);
+  }
+  scheduleSave();closeModal('ph-edit-modal');renderPrintheads();
+}
+function deletePH(){
+  const id=document.getElementById('ph-edit-id').value;
+  if(!confirm('Delete this printhead and all cleaning records?'))return;
+  const p=printheads.find(x=>x.id==id);if(p)logEntry('PH-DELETE','Deleted: '+p.brand+' '+p.model);
+  printheads=printheads.filter(x=>x.id!=id);scheduleSave();closeModal('ph-edit-modal');renderPrintheads();
+}
+function openPHDetail(id){
+  const p=printheads.find(x=>x.id==id);if(!p)return;currentPHId=id;
+  document.getElementById('ph-detail-title').textContent=p.brand+' '+p.model+' — S/N: '+p.serial;
+  document.getElementById('pd-print-status').value=p.printStatus;
+  document.getElementById('pd-install-status').value=p.installStatus;
+  document.getElementById('cl-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('cl-operator').value='';document.getElementById('cl-comment').value='';document.getElementById('cl-result').value='Improved';
+  renderDetailInfo(p);renderCleanHistory(p);
+  document.getElementById('ph-detail-modal').style.display='flex';
+}
+function renderDetailInfo(p){
+  document.getElementById('ph-detail-info').innerHTML=
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;background:#fafaf8;border:1px solid #e0dfd8;border-radius:8px;padding:12px 16px">'+
+    '<div><span style="color:#73726c;font-size:11px">Brand</span><br><strong>'+p.brand+'</strong></div>'+
+    '<div><span style="color:#73726c;font-size:11px">Model</span><br><strong>'+p.model+'</strong></div>'+
+    '<div><span style="color:#73726c;font-size:11px">Serial</span><br><strong style="font-family:monospace">'+p.serial+'</strong></div>'+
+    '<div><span style="color:#73726c;font-size:11px">Installation</span><br><span class="badge '+phIB(p.installStatus)+'">'+p.installStatus+'</span></div>'+
+    '<div><span style="color:#73726c;font-size:11px">Print status</span><br><span class="'+phPC(p.printStatus)+'">'+p.printStatus+'</span></div>'+
+    (p.location?'<div><span style="color:#73726c;font-size:11px">Location</span><br><strong>'+p.location+'</strong></div>':'')+
+    (p.dateInstalled?'<div><span style="color:#73726c;font-size:11px">Installed</span><br><strong>'+p.dateInstalled+'</strong></div>':'')+
+    (p.notes?'<div style="flex:1;min-width:200px"><span style="color:#73726c;font-size:11px">Notes</span><br>'+p.notes+'</div>':'')+
+    '</div>';
+}
+function renderCleanHistory(p){
+  const cl=p.cleans||[];
+  if(!cl.length){document.getElementById('ph-clean-history').innerHTML='<p style="color:#73726c;font-size:13px">No cleaning records yet.</p>';return;}
+  document.getElementById('ph-clean-history').innerHTML=[...cl].reverse().map(c=>
+    '<div class="clean-entry"><div class="clean-entry-header"><span style="font-weight:600">'+c.date+'</span>'+
+    '<span class="badge '+(c.result==='Cleared'?'badge-ok':c.result==='Improved'?'badge-order':c.result==='Worse'?'badge-out':'badge-disc')+'">'+c.result+'</span></div>'+
+    '<div class="clean-meta">Operator: <strong>'+c.operator+'</strong></div>'+
+    (c.comment?'<div style="font-style:italic;margin-top:4px;font-size:13px">'+c.comment+'</div>':'')+
+    '<div style="text-align:right;margin-top:6px"><button class="btn btn-danger btn-sm" onclick="deleteClean('+p.id+','+c.id+')">Remove</button></div></div>'
+  ).join('');
+}
+function addClean(){
+  const p=printheads.find(x=>x.id==currentPHId);if(!p)return;
+  const date=document.getElementById('cl-date').value,op=document.getElementById('cl-operator').value.trim();
+  if(!date||!op){alert('Date and operator are required.');return;}
+  if(!p.cleans)p.cleans=[];
+  const entry={id:uid(),date,operator:op,result:document.getElementById('cl-result').value,comment:document.getElementById('cl-comment').value.trim()};
+  p.cleans.push(entry);
+  logEntry('PH-CLEAN',p.brand+' '+p.model+' S/N:'+p.serial+' — '+op+' ('+entry.result+')');
+  scheduleSave();renderDetailInfo(p);renderCleanHistory(p);
+  document.getElementById('cl-operator').value='';document.getElementById('cl-comment').value='';
+}
+function deleteClean(phId,cleanId){
+  if(!confirm('Remove this cleaning record?'))return;
+  const p=printheads.find(x=>x.id==phId);if(!p)return;
+  p.cleans=p.cleans.filter(c=>c.id!=cleanId);
+  logEntry('PH-CLEAN-DEL','Removed clean entry from '+p.brand+' '+p.model);
+  scheduleSave();renderCleanHistory(p);renderPrintheads();
+}
+function saveDetailStatus(e){
+  const p=printheads.find(x=>x.id==currentPHId);if(!p)return;
+  const np=document.getElementById('pd-print-status').value,ni=document.getElementById('pd-install-status').value;
+  const ch=[];
+  if(p.printStatus!==np){ch.push('print: '+p.printStatus+'→'+np);p.printStatus=np;}
+  if(p.installStatus!==ni){ch.push('install: '+p.installStatus+'→'+ni);p.installStatus=ni;}
+  if(ch.length)logEntry('PH-STATUS',p.brand+' '+p.model+' — '+ch.join(', '));
+  scheduleSave();renderDetailInfo(p);renderPrintheads();
+  const btn=e.target;btn.textContent='Saved!';setTimeout(()=>btn.textContent='Update status',1500);
+}
+
+// ── START ──────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
